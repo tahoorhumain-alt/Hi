@@ -5,6 +5,11 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
+// Add this AFTER `app.use(cors());` and BEFORE `const server = http.createServer(app);`
+
+app.get('/', (req, res) => {
+    res.send('OK');
+});
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: { origin: "*" }
