@@ -66,6 +66,7 @@
 .toggle:after{content:"";display:block;width:19px;height:19px;background:white;border-radius:50%;transition:.2s}
 .toggle.on{background:var(--pink)}.toggle.on:after{transform:translateX(18px)}
 .primary{width:100%;margin-top:16px;border-radius:14px;padding:13px;background:linear-gradient(100deg,#ff3b87,#9d57ff);font-weight:800}
+.primary:disabled{opacity:.5;cursor:not-allowed}
 .ghost{width:100%;margin-top:9px;border-radius:14px;padding:12px;background:#ffffff0f;border:1px solid #ffffff1c;font-weight:700;font-size:13px}
 .progress{position:absolute;top:0;left:0;right:0;height:2px;z-index:3;background:#ffffff20}
 .progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--pink));box-shadow:0 0 12px #ffffff88;transition:width .12s linear}
@@ -79,7 +80,12 @@ textarea::placeholder{color:#5c5c70}
 .info{display:none;margin-top:12px;background:#0f0f16;border:1px solid #ffffff14;border-radius:14px;padding:12px;font-size:12px;line-height:1.6;color:#c9c9d8}
 .info.show{display:block}
 .info b{color:var(--cyan)}
-/* media reels (uploads + cloud links) */
+.upload-progress{width:100%;height:4px;background:#ffffff14;border-radius:99px;margin-top:12px;overflow:hidden;display:none}
+.upload-progress.show{display:block}
+.upload-progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,#54f3dc,#ff3b87);transition:width .2s}
+.upload-status{font-size:11px;color:var(--muted);margin-top:6px;display:none}
+.upload-status.show{display:block}
+/* media reels */
 .media-reel .art{background:#12131b}
 .upload-media{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;background:#08080d}
 .upload-audio{position:absolute;z-index:2;left:18px;right:18px;top:40%;width:calc(100% - 36px);filter:drop-shadow(0 8px 28px #0008)}
@@ -154,7 +160,7 @@ textarea::placeholder{color:#5c5c70}
   <section class="overlay" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addTitle">
     <div class="modal">
       <h2 id="addTitle">Add to your LOOP</h2>
-      <p>Your feed can hold infinite media. Use your device, or paste links from a free host like Zonerama.</p>
+      <p>Upload directly or paste links from a free host. <b>Direct video uploads</b> are stored permanently on Catbox.moe.</p>
       <div class="tabs">
         <button class="on" data-tab="device">📱 Device</button>
         <button data-tab="link">☁ Link / Zonerama</button>
@@ -162,24 +168,26 @@ textarea::placeholder{color:#5c5c70}
 
       <div data-pane="device">
         <div class="modal-row"><span>Images</span><span style="color:var(--cyan)">JPG · PNG · WEBP</span></div>
-        <div class="modal-row"><span>Audio</span><span style="color:var(--cyan)">MP3 · WAV · M4A*</span></div>
-        <div class="modal-row"><span>Video</span><span style="color:var(--cyan)">MP4 · WEBM*</span></div>
-        <p class="note">*Format support depends on your browser. Local files stay in this tab — nothing is uploaded anywhere.</p>
+        <div class="modal-row"><span>Videos</span><span style="color:var(--cyan)">MP4 · WEBM · MOV</span></div>
+        <div class="modal-row"><span>Audio</span><span style="color:var(--cyan)">MP3 · WAV · M4A</span></div>
+        <p class="note">✅ <b>Videos up to 200MB</b> are uploaded permanently to Catbox.moe — no account needed. Larger files (up to 1GB) use temporary storage.</p>
         <button class="primary" id="chooseMedia">Choose files</button>
+        <div class="upload-progress" id="uploadProgress"><span id="uploadBar"></span></div>
+        <div class="upload-status" id="uploadStatus">Uploading…</div>
       </div>
 
       <div data-pane="link" hidden>
         <p class="note" style="margin-top:0">Paste <b style="color:#54f3dc">direct</b> image, video or audio links — one per line.</p>
         <textarea id="linkInput" spellcheck="false" placeholder="https://eu.zonerama.com/.../photo.jpg
 https://cdn.example.com/clip.mp4
-https://cdn.example.com/track.mp3"></textarea>
+https://files.catbox.moe/xxxxxx.mp4"></textarea>
         <button class="primary" id="addLinks">Add links to feed</button>
         <button class="ghost" id="zHelp">☁ How Zonerama works</button>
         <div class="info" id="zInfo">
-          <b>Zonerama</b> gives you <b>unlimited free storage</b> for photos and videos with no compression — a great free media host.<br><br>
-          <b>Limits:</b> videos must be <b>5 minutes or shorter</b>, max 200 MB per photo, no embedding on the free plan.<br><br>
-          <b>Get a direct link:</b> open your Zonerama album → open the photo/video → <b>Share</b> → copy the direct file link (it ends in .jpg, .png, .mp4 …) → paste it above.<br><br>
-          ⚠️ The album must be public or link-shareable, otherwise the media will not load. LOOP only stores the URL — the file stays on Zonerama.
+          <b>Zonerama</b> gives you <b>unlimited free storage</b> for photos and videos with no compression.<br><br>
+          <b>Limits:</b> videos must be <b>5 minutes or shorter</b>, max 200 MB per photo.<br><br>
+          <b>Get a direct link:</b> open your Zonerama album → open the photo/video → <b>Share</b> → copy the direct file link → paste it above.<br><br>
+          ⚠️ The album must be public or link-shareable. LOOP only stores the URL.
         </div>
       </div>
 
@@ -522,7 +530,7 @@ https://cdn.example.com/track.mp3"></textarea>
     return el;
   }
 
-  /* media reel — device uploads AND cloud/Zonerama links */
+  /* media reel */
   function makeMediaReel(o) {
     const idx = count++;
     const el = document.createElement('article');
@@ -591,6 +599,40 @@ https://cdn.example.com/track.mp3"></textarea>
     return el;
   }
 
+  /* ---------------- CATBOX UPLOAD ENGINE (unlimited free storage) ---------------- */
+  const CATBOX_API = 'https://catbox.moe/user/api.php';
+
+  async function uploadToCatbox(file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const form = new FormData();
+      form.append('reqtype', 'fileupload');
+      form.append('fileToUpload', file);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', CATBOX_API, true);
+
+      if (onProgress && xhr.upload) {
+        xhr.upload.addEventListener('progress', e => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        });
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const url = xhr.responseText.trim();
+          if (url.startsWith('https://')) resolve(url);
+          else reject(new Error('Unexpected response: ' + url));
+        } else {
+          reject(new Error('Upload failed: ' + xhr.status));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.timeout = 120000;
+      xhr.ontimeout = () => reject(new Error('Upload timed out'));
+      xhr.send(form);
+    });
+  }
+
   /* ---------------- feed generation ---------------- */
   function addBatch(n = 4) {
     const frag = document.createDocumentFragment();
@@ -626,7 +668,6 @@ https://cdn.example.com/track.mp3"></textarea>
     const idx = Number(el.dataset.index);
     const bar = el.querySelector('.progress span');
 
-    // combo
     const now = performance.now();
     if (now - lastAdvance < 3200) combo++; else combo = 1;
     lastAdvance = now;
@@ -639,7 +680,6 @@ https://cdn.example.com/track.mp3"></textarea>
     }
     if (combo > S.bestCombo) { S.bestCombo = combo; }
 
-    // progress-driven XP
     clearInterval(viewTimer);
     const alreadySeen = S.seen.includes(idx);
     if (el.classList.contains('media-reel') || alreadySeen) {
@@ -669,7 +709,6 @@ https://cdn.example.com/track.mp3"></textarea>
       }
     }, 100);
 
-    // infinite feed top-up
     const kids = [...feed.children];
     if (kids.indexOf(el) >= kids.length - 4) addBatch(4);
     if (autoOn) startAuto();
@@ -679,7 +718,7 @@ https://cdn.example.com/track.mp3"></textarea>
   function goNext() {
     const n = currentEl ? currentEl.nextElementSibling : feed.firstElementChild;
     if (n) n.scrollIntoView({ behavior: motionOn ? 'smooth' : 'auto', block: 'start' });
-    else { addBatch(4); }
+    else addBatch(4);
   }
   function goPrev() {
     const p = currentEl ? currentEl.previousElementSibling : null;
@@ -692,9 +731,12 @@ https://cdn.example.com/track.mp3"></textarea>
   }
   feed.addEventListener('scroll', () => { if (autoOn) startAuto(); }, { passive: true });
 
-  /* ---------------- add media: device ---------------- */
+  /* ---------------- add media: device (with Catbox upload) ---------------- */
   const mediaPicker = $('#mediaPicker');
   const addModal = $('#addModal');
+  const uploadProg = $('#uploadProgress');
+  const uploadBar = $('#uploadBar');
+  const uploadStatus = $('#uploadStatus');
   const localUrls = [];
 
   function openAdd() { addModal.classList.add('show'); }
@@ -708,48 +750,100 @@ https://cdn.example.com/track.mp3"></textarea>
   }));
   $('#zHelp').addEventListener('click', () => $('#zInfo').classList.toggle('show'));
 
-  mediaPicker.addEventListener('change', () => {
-    const files = [...(mediaPicker.files || [])];
+  async function handleDeviceFiles(files) {
     addModal.classList.remove('show');
     if (!files.length) return;
-    let added = 0;
 
-    files.forEach(file => {
-      const url = URL.createObjectURL(file);
+    let added = 0, failed = 0;
+    const total = files.length;
+
+    for (let fi = 0; fi < files.length; fi++) {
+      const file = files[fi];
       const type = file.type || '';
       const isImage = type.startsWith('image/') || /\.(png|jpe?g|gif|webp|avif|heic)$/i.test(file.name);
       const isAudio = type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(file.name);
       const isVideo = type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
-      if (!isImage && !isAudio && !isVideo) { URL.revokeObjectURL(url); toast('That file type is not supported'); return; }
 
-      localUrls.push(url);
+      if (!isImage && !isAudio && !isVideo) { failed++; toast(`"${file.name}" is not a supported media type`); continue; }
+
       const kind = isImage ? 'image' : isVideo ? 'video' : 'audio';
       const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').slice(0, 55) || 'Your upload';
-      const el = makeMediaReel({
-        url, kind, title,
-        badge: 'YOUR DEVICE · LOCAL',
-        note: isImage ? 'Image added to your local feed.' : isAudio ? 'Audio ready to play. Tap play to listen.' : 'Video added to your local feed. Tap play to watch.',
-        author: 'My upload', sub: 'only on this device',
-        canRemove: true, revoke: true
-      });
-      feed.prepend(el);
-      observer.observe(el);
-      el.dataset.observed = '1';
-      added++;
-      S.uploads = (S.uploads || 0) + 1;
-    });
+
+      // Show upload progress
+      uploadProg.classList.add('show');
+      uploadStatus.classList.add('show');
+      uploadStatus.textContent = `Uploading ${fi + 1}/${total}: ${title}…`;
+      uploadBar.style.width = '0%';
+
+      try {
+        const cloudUrl = await uploadToCatbox(file, pct => {
+          uploadBar.style.width = pct + '%';
+        });
+
+        // Build reel with cloud URL (permanent, unlimited)
+        const isCatboxTemporary = file.size > 200 * 1024 * 1024;
+        const el = makeMediaReel({
+          url: cloudUrl,
+          kind,
+          title,
+          badge: isCatboxTemporary ? '☁ CATBOX · TEMPORARY' : '☁ CATBOX · PERMANENT',
+          note: isImage ? 'Image stored permanently on Catbox.moe.'
+              : isAudio ? 'Audio stored on Catbox.moe. Tap play to listen.'
+              : 'Video stored permanently on Catbox.moe. Tap play to watch.',
+          author: 'My upload',
+          sub: isCatboxTemporary ? 'expires in 72h · up to 1GB' : 'stored forever · ≤200MB',
+          canRemove: true,
+          revoke: false
+        });
+        feed.prepend(el);
+        observer.observe(el);
+        el.dataset.observed = '1';
+        added++;
+        S.uploads = (S.uploads || 0) + 1;
+
+      } catch (err) {
+        // Fallback: store locally as blob URL
+        console.warn('Catbox upload failed, using local blob:', err);
+        const url = URL.createObjectURL(file);
+        localUrls.push(url);
+        const el = makeMediaReel({
+          url, kind, title,
+          badge: 'YOUR DEVICE · LOCAL',
+          note: isImage ? 'Image added locally (upload failed).' : isAudio ? 'Audio added locally.' : 'Video added locally.',
+          author: 'My upload', sub: 'only on this device',
+          canRemove: true, revoke: true
+        });
+        feed.prepend(el);
+        observer.observe(el);
+        el.dataset.observed = '1';
+        added++;
+        S.uploads = (S.uploads || 0) + 1;
+      }
+    }
+
+    // Hide progress
+    uploadProg.classList.remove('show');
+    uploadStatus.classList.remove('show');
+    uploadBar.style.width = '0%';
 
     mediaPicker.value = '';
+
     if (added) {
       feed.scrollTo({ top: 0, behavior: motionOn ? 'smooth' : 'auto' });
       addXP(15, null, true);
-      toast(`${added} file${added === 1 ? '' : 's'} added · +15 XP`);
+      toast(`✅ ${added} file${added === 1 ? '' : 's'} uploaded & added · +15 XP`);
       confetti(28);
       checkAchv(); save();
     }
+    if (failed) toast(`${failed} file${failed === 1 ? '' : 's'} skipped (unsupported type)`);
+  }
+
+  mediaPicker.addEventListener('change', () => {
+    const files = [...(mediaPicker.files || [])];
+    if (files.length) handleDeviceFiles(files);
   });
 
-  /* ---------------- add media: cloud links (Zonerama etc.) ---------------- */
+  /* ---------------- add media: cloud links ---------------- */
   function classify(url) {
     if (/\.(jpe?g|png|gif|webp|avif|heic|bmp|tiff?)(\?|#|$)/i.test(url)) return 'image';
     if (/\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(url)) return 'video';
@@ -808,7 +902,6 @@ https://cdn.example.com/track.mp3"></textarea>
   const soundBtn = $('#soundBtn');
   soundBtn.addEventListener('click', () => {
     soundOn = !soundOn;
-    soundBtn.textContent = soundOn ? '♪' : '♪';
     soundBtn.classList.toggle('active', soundOn);
     soundBtn.setAttribute('aria-label', soundOn ? 'Sound on' : 'Sound off');
     if (soundOn) {
